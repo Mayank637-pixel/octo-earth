@@ -11,6 +11,9 @@ add_compile_options(-O3 -ffast-math -Wall -Wextra)
 
 add_library(octocore SHARED
         src/c_api_bridge.cpp
+        src/integrator.cpp
+        src/lorentz_octopus.cpp
+        src/rulebook_validator.cpp
 )
 
 target_include_directories(octocore PUBLIC
@@ -23,3 +26,15 @@ add_executable(test_sanity
         tests/test.cpp)
 target_link_libraries(test_sanity PRIVATE octocore)
 add_test(NAME test_sanity COMMAND test_sanity)
+
+add_executable(test_energy_conservation tests/test_energy_conservation.cpp)
+target_link_libraries(test_energy_conservation PRIVATE octocore)
+add_test(NAME test_energy_conservation COMMAND test_energy_conservation)
+
+add_executable(test_physics tests/test_physics.cpp)
+target_link_libraries(test_physics PRIVATE octocore)
+add_test(NAME test_physics COMMAND test_physics)
+
+add_executable(bench_10k_years tests/bench_10k_years.cpp)
+target_link_libraries(bench_10k_years PRIVATE octocore)
+add_test(NAME bench_10k_years COMMAND bench_10k_years)

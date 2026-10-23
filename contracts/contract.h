@@ -6,6 +6,8 @@
 #include  <stdint.h>
 
 
+#pragma pack(push, 1)
+
 #ifdef __cplusplus
 
 extern "C" {
@@ -36,6 +38,11 @@ extern "C" {
   } TelemetryFrame;
 
 #pragma pack(pop)
+
+#ifdef __cplusplus
+static_assert(sizeof(SimConfig) == 48, "SimConfig ABI must be 48 bytes");
+static_assert(sizeof(TelemetryFrame) == 176, "TelemetryFrame ABI must be 176 bytes");
+#endif
 #define OCTO_EXPORT __attribute__((visibility("default")))
   OCTO_EXPORT void run_simulation(const SimConfig* config, TelemetryFrame* out_frames, size_t max_frames);
 
