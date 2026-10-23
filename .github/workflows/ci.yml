@@ -1,0 +1,56 @@
+name: Monorepo CI Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  contract-parity:
+    name: Check Contract Parity (176 Bytes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 contracts/generate_schemas.py --check
+
+  cpp-core:
+    name: Build & Test C++ Core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure CMake
+        run: cmake -B core-cpp/build -S core-cpp -DCMAKE_BUILD_TYPE=Release
+      - name: Build Shared Library & Test
+        run: cmake --build core-cpp/build --parallel
+      - name: Run CTest
+        run: ctest --test-dir core-cpp/build --output-on-failure
+
+  python-backend:
+    name: Lint & Test Python Bridge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff pytest numpy fastapi websockets
+      - name: Lint with Ruff
+        run: ruff check backend-py/
+      - name: Run Pytest
+        run: pytest backend-py/tests/ -v
+
+  frontend-web:
+    name: Typecheck & Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: cd frontend-web && npm install
+      - run: cd frontend-web && npm run typecheck
+      - run: cd frontend-web && npm run build
