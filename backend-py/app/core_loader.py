@@ -17,9 +17,18 @@ TELEMETRY_DTYPE = np.dtype([
     ("status_bitmask", np.uint8),
     ("padding", np.uint8, (3,)),
 ], align=False)
+WORLD_DTYPE = np.dtype([
+    ("time_years", np.float64),
+    ("body_pos_au", np.float64, (10, 3)),
+    ("minimum_separation_au", np.float64),
+    ("status_bitmask", np.uint8),
+    ("padding", np.uint8, (7,)),
+], align=False)
 
 if TELEMETRY_DTYPE.itemsize != 176:
     raise RuntimeError(f"Telemetry ABI mismatch: NumPy dtype is {TELEMETRY_DTYPE.itemsize} bytes")
+if WORLD_DTYPE.itemsize != 264:
+    raise RuntimeError(f"World ABI mismatch: NumPy dtype is {WORLD_DTYPE.itemsize} bytes")
 
 class SimConfig(ctypes.Structure):
     _pack_ = 1
@@ -55,6 +64,12 @@ def load_octocore() -> Any:
                 ctypes.c_size_t,
             ]
             lib.run_simulation.restype = None
+            lib.run_world_simulation.argtypes = [
+                ctypes.POINTER(SimConfig),
+                ctypes.c_void_p,
+                ctypes.c_size_t,
+            ]
+            lib.run_world_simulation.restype = None
             return lib
     return None
 
@@ -73,5 +88,20 @@ def run_simulation(config: SimConfig, frames: int, library: Any = None) -> np.nd
         ctypes.byref(config),
         ctypes.c_void_p(buffer.ctypes.data),
         ctypes.c_size_t(frames),
+    )
+    return buffer
+
+
+def run_world_simulation(config: SimConfig, frames: int, library: Any = None) -> np.ndarray:
+    if frames < 1 or frames > 1_000_000:
+        raise ValueError("frames must be between 1 and 1,000,000")
+    if library is None:
+        library = load_octocore()
+    if library is None:
+        raise RuntimeError("liboctocore.so is not available; set OCTOCORE_LIB_PATH")
+    config.num_output_frames = frames
+    buffer = np.empty(frames, dtype=WORLD_DTYPE)
+    library.run_world_simulation(
+        ctypes.byref(config), ctypes.c_void_p(buffer.ctypes.data), ctypes.c_size_t(frames)
     )
     return buffer

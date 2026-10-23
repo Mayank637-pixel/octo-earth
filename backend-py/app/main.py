@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.core_loader import SimConfig, load_octocore, run_simulation
+from app.core_loader import SimConfig, load_octocore, run_simulation, run_world_simulation
 
 app = FastAPI(title="Octo-Earth Mission Control API")
 app.add_middleware(
@@ -29,12 +29,17 @@ class SimulationRequest(BaseModel):
     jc_limit_a_m2: float = Field(1.0e20, gt=0.0)
     yield_strength_pa: float = Field(1.5e18, gt=0.0)
     gravity_tether_on: bool = True
+    propulsion_enabler: bool = True
+    structural_enabler: bool = True
+    superconducting_enabler: bool = True
     frames: int = Field(10000, ge=1, le=1_000_000)
 
     def to_c_config(self) -> SimConfig:
+        mask = (1 if self.gravity_tether_on else 0) | (2 if self.propulsion_enabler else 0)
+        mask |= (4 if self.structural_enabler else 0) | (8 if self.superconducting_enabler else 0)
         return SimConfig(
             self.target_au, self.max_years, self.arm_length_m, self.jc_limit_a_m2,
-            self.yield_strength_pa, int(self.gravity_tether_on), self.frames,
+            self.yield_strength_pa, mask, self.frames,
         )
 
 
@@ -91,6 +96,30 @@ def simulate_defaults(
     """Convenient browser/Postman GET equivalent of the JSON POST endpoint."""
     request = SimulationRequest(frames=frames, target_au=target_au, max_years=max_years)
     return simulate(request, chunk_frames)
+
+
+@app.post("/api/ephemeris")
+def ephemeris(
+    request: SimulationRequest,
+    chunk_frames: int = Query(256, ge=1, le=10_000),
+) -> StreamingResponse:
+    """Stream positions for Mercury through Neptune and the Moon as 264-byte frames."""
+    if libocto is None:
+        raise HTTPException(status_code=503, detail="C++ core is unavailable")
+    try:
+        world = run_world_simulation(request.to_c_config(), request.frames, libocto)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    headers = {
+        "X-Octo-Frame-Bytes": str(world.dtype.itemsize),
+        "X-Octo-Frame-Count": str(len(world)),
+        "X-Octo-Format": "WorldTelemetryFrame-v1-little-endian",
+    }
+    return StreamingResponse(
+        _chunks(memoryview(world).cast("B"), chunk_frames * world.dtype.itemsize),
+        media_type="application/octet-stream",
+        headers=headers,
+    )
 
 
 @app.websocket("/ws/simulate")
