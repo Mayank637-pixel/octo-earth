@@ -19,6 +19,7 @@ target_include_directories(octocore PUBLIC
 )
 
 enable_testing()
-add_executable(test_sanity tests/bench_10k_years.cpp)
+add_executable(test_sanity
+        tests/test.cpp)
 target_link_libraries(test_sanity PRIVATE octocore)
 add_test(NAME test_sanity COMMAND test_sanity)

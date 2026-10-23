@@ -9,6 +9,7 @@ Thumbs.db
 # C++ Build Artifacts
 core-cpp/build/
 core-cpp/bin/
+core-cpp/cmake-build-debug
 core-cpp/lib/
 *.so
 *.dylib
