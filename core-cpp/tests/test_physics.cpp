@@ -1,5 +1,6 @@
 #include "lorentz_octopus.hpp"
 #include "rulebook_validator.hpp"
+#include "world_model.hpp"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -36,4 +37,12 @@ int main() {
     const auto unsafe_result = unsafe.evaluate(one_au, 0.0, 2.25e17, parker);
     require((validateRulebook(unsafe_result, true) & 4U) != 0,
             "over-current condition raises quench status");
+
+    WorldSimulator world(2.7, 10000.0, OCTO_ENABLERS_ALL);
+    world.advance_to(25.0);
+    const auto snapshot = world.state();
+    require(std::abs(snapshot.positions_au[0].z) > 1.0e-6 ||
+            std::abs(snapshot.positions_au[1].z) > 1.0e-6,
+            "inclined planetary orbits produce non-zero z motion");
+    require(snapshot.minimum_separation_au > 0.0, "minimum separation is calculated");
 }

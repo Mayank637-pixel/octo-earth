@@ -14,6 +14,7 @@ add_library(octocore SHARED
         src/integrator.cpp
         src/lorentz_octopus.cpp
         src/rulebook_validator.cpp
+        src/world_model.cpp
 )
 
 target_include_directories(octocore PUBLIC

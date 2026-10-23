@@ -1,0 +1,19 @@
+services:
+  core-api:
+    build:
+      context: .
+      dockerfile: backend-py/Dockerfile
+    environment:
+      OCTOCORE_LIB_PATH: /app/liboctocore.so
+    ports:
+      - "8000:8000"
+  frontend:
+    build:
+      context: frontend-web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://core-api:8000
+    depends_on:
+      - core-api

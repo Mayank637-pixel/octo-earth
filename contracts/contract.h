@@ -19,10 +19,18 @@ extern "C" {
     double arm_length_m;
     double jc_limit_a_m2;
     double yield_strength_pa;
-    uint32_t gravity_tether_on; // 1 = enabler 3 activw, 0 = pure mechanical
+    uint32_t gravity_tether_on; // legacy bool; API may use OCTO_ENABLER_* bitmask
     uint32_t num_output_frames; // no of frames
 
   } SimConfig;
+
+  enum {
+    OCTO_ENABLER_GRAVITY_TETHER = 1u,
+    OCTO_ENABLER_PROPULSION = 2u,
+    OCTO_ENABLER_STRUCTURE = 4u,
+    OCTO_ENABLER_SUPERCONDUCTOR = 8u,
+    OCTO_ENABLERS_ALL = 15u
+  };
 
   typedef struct {
     double time_y;
@@ -37,14 +45,24 @@ extern "C" {
     unsigned char padding[3];
   } TelemetryFrame;
 
+  typedef struct {
+    double time_y;
+    double body_pos_au[10][3]; // Mercury..Neptune, Moon is geocentric
+    double minimum_separation_au;
+    uint8_t status_bitmask;
+    unsigned char padding[7];
+  } WorldTelemetryFrame;
+
 #pragma pack(pop)
 
 #ifdef __cplusplus
 static_assert(sizeof(SimConfig) == 48, "SimConfig ABI must be 48 bytes");
 static_assert(sizeof(TelemetryFrame) == 176, "TelemetryFrame ABI must be 176 bytes");
+static_assert(sizeof(WorldTelemetryFrame) == 264, "WorldTelemetryFrame ABI must be 264 bytes");
 #endif
 #define OCTO_EXPORT __attribute__((visibility("default")))
   OCTO_EXPORT void run_simulation(const SimConfig* config, TelemetryFrame* out_frames, size_t max_frames);
+  OCTO_EXPORT void run_world_simulation(const SimConfig* config, WorldTelemetryFrame* out_frames, size_t max_frames);
 
 #ifdef __cplusplus
 }
