@@ -1,6 +1,8 @@
 import ctypes
 import os
 from pathlib import Path
+from typing import Any
+
 import numpy as np
 
 TELEMETRY_DTYPE = np.dtype([
@@ -16,7 +18,8 @@ TELEMETRY_DTYPE = np.dtype([
     ("padding", np.uint8, (3,)),
 ], align=False)
 
-assert TELEMETRY_DTYPE.itemsize == 176, f"Dtype itemsize {TELEMETRY_DTYPE.itemsize} != 176"
+if TELEMETRY_DTYPE.itemsize != 176:
+    raise RuntimeError(f"Telemetry ABI mismatch: NumPy dtype is {TELEMETRY_DTYPE.itemsize} bytes")
 
 class SimConfig(ctypes.Structure):
     _pack_ = 1
@@ -30,7 +33,12 @@ class SimConfig(ctypes.Structure):
         ("num_output_frames", ctypes.c_uint32),
     ]
 
-def load_octocore():
+    @classmethod
+    def defaults(cls, frames: int = 10000) -> "SimConfig":
+        return cls(2.70, 10000.0, 1.2e7, 1.0e20, 1.5e18, 1, frames)
+
+
+def load_octocore() -> Any:
     # Search common build paths
     candidates = [
         os.environ.get("OCTOCORE_LIB_PATH", ""),
@@ -49,3 +57,21 @@ def load_octocore():
             lib.run_simulation.restype = None
             return lib
     return None
+
+
+def run_simulation(config: SimConfig, frames: int, library: Any = None) -> np.ndarray:
+    """Run the C ABI directly into a contiguous NumPy buffer (one copy at most on send)."""
+    if frames < 1 or frames > 1_000_000:
+        raise ValueError("frames must be between 1 and 1,000,000")
+    if library is None:
+        library = load_octocore()
+    if library is None:
+        raise RuntimeError("liboctocore.so is not available; set OCTOCORE_LIB_PATH")
+    config.num_output_frames = frames
+    buffer = np.empty(frames, dtype=TELEMETRY_DTYPE)
+    library.run_simulation(
+        ctypes.byref(config),
+        ctypes.c_void_p(buffer.ctypes.data),
+        ctypes.c_size_t(frames),
+    )
+    return buffer
